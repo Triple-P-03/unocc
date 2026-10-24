@@ -8,7 +8,7 @@ Find free classrooms and labs in the Digital Tower in real time: live room statu
 
 ```bash
 npm install      # or: bun install
-npm run dev      # opens on http://localhost:8080
+npm run dev      # opens on http://localhost:5173
 ```
 
 On Windows PowerShell, run:
@@ -19,7 +19,7 @@ npm install
 npm run dev
 ```
 
-Then open http://localhost:8080. The live n8n webhook is configured through
+Then open http://localhost:5173. The live n8n webhook is configured through
 `LIVE_TIMETABLE_URL` and is available through the server-side `/api/timetable`
 proxy.
 

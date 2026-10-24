@@ -21,15 +21,5 @@ export function useRoomStates(win: Window | null, rooms: Room[] = ROOMS): RoomSt
       (win.from === defaultStart(now.minutes) || (win.from <= now.minutes && now.minutes < win.to));
 
     return isCurrentWindow ? states.map((state) => applyLiveNowState(state, liveNow, win)) : states;
-  }, [
-    win?.dateISO,
-    win?.weekday,
-    win?.from,
-    win?.to,
-    rooms,
-    updates,
-    now?.dateISO,
-    now?.minutes,
-    liveNow,
-  ]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [win, rooms, updates, now, liveNow]);
 }

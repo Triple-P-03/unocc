@@ -1,0 +1,11 @@
+{
+  "name": "unoocc-full-source",
+  "private": true,
+  "workspaces": ["unoocc"],
+  "scripts": {
+    "dev": "npm --prefix unoocc run dev",
+    "build": "npm --prefix unoocc run build",
+    "test": "npm --prefix unoocc run test",
+    "lint": "npm --prefix unoocc run lint"
+  }
+}
