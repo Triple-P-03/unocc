@@ -3,9 +3,26 @@
  * then answers using the same availability logic as the rest of the site.
  * Room status is always computed in code — never invented.
  */
-import { isAvailable, roomState, sortStates, type FacultyUpdate, type RoomState } from "./availability";
+import { applyLiveNowState, type LiveNowSnapshot } from "./live-timetable";
+import {
+  isAvailable,
+  roomState,
+  sortStates,
+  type FacultyUpdate,
+  type RoomState,
+} from "./availability";
 import { FLOORS, ROOMS, SCHEDULE, type RoomType } from "./rooms-data";
-import { addDays, DAY_END, DAY_NAMES, DAY_START, defaultStart, fmt, fmtDuration, longDate, type Now } from "./time";
+import {
+  addDays,
+  DAY_END,
+  DAY_NAMES,
+  DAY_START,
+  defaultStart,
+  fmt,
+  fmtDuration,
+  longDate,
+  type Now,
+} from "./time";
 
 export interface ParsedQuery {
   dateISO: string;
@@ -50,7 +67,9 @@ export function parseQuery(input: string, now: Now): ParsedQuery {
   let from: number | undefined;
   const ampm = text.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/);
   const clock = text.match(/\b(\d{1,2}):(\d{2})\b/);
-  const at = text.match(/\b(?:at|from|by)\s+(\d{1,2})(?::(\d{2}))?\b(?!\s*(?:st|nd|rd|th|floor|people|students|seats|hours?|hrs?))/);
+  const at = text.match(
+    /\b(?:at|from|by)\s+(\d{1,2})(?::(\d{2}))?\b(?!\s*(?:st|nd|rd|th|floor|people|students|seats|hours?|hrs?))/,
+  );
   if (ampm) {
     let h = Number(ampm[1]) % 12;
     if (ampm[3] === "pm") h += 12;
@@ -80,7 +99,8 @@ export function parseQuery(input: string, now: Now): ParsedQuery {
 
   let floor: number | undefined;
   let unknownFloor: number | undefined;
-  const fm = text.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s*floor\b/) ?? text.match(/\bfloor\s*(\d{1,2})\b/);
+  const fm =
+    text.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s*floor\b/) ?? text.match(/\bfloor\s*(\d{1,2})\b/);
   const ground = /\bground floor\b/.test(text);
   const requested = ground ? 0 : fm ? Number(fm[1]) : undefined;
   if (requested !== undefined) {
@@ -116,9 +136,16 @@ function dayPhrase(q: ParsedQuery) {
   return `${when}, ${fmt(q.from)}–${fmt(q.from + q.dur)}`;
 }
 
-export function answerQuestion(input: string, now: Now, updates: FacultyUpdate[], favorites: string[] = []): AssistantAnswer {
+export function answerQuestion(
+  input: string,
+  now: Now,
+  updates: FacultyUpdate[],
+  favorites: string[] = [],
+  liveNow: LiveNowSnapshot | null = null,
+): AssistantAnswer {
   const text = input.trim().toLowerCase();
-  if (!text) return { text: "Ask me which rooms are free — for example “Free labs right now”.", rooms: [] };
+  if (!text)
+    return { text: "Ask me which rooms are free — for example “Free labs right now”.", rooms: [] };
 
   if (/^(hi|hello|hey|namaste|good (morning|afternoon|evening))\b[\s!.]*$/.test(text)) {
     return {
@@ -132,10 +159,17 @@ export function answerQuestion(input: string, now: Now, updates: FacultyUpdate[]
 
   const q = parseQuery(input, now);
   const win = { dateISO: q.dateISO, weekday: q.weekday, from: q.from, to: q.from + q.dur };
+  const live = q.isNow && liveNow?.dateISO === q.dateISO ? liveNow : null;
+  const stateFor = (room: (typeof ROOMS)[number]) => {
+    const state = roomState(room, win, SCHEDULE, updates);
+    return live ? applyLiveNowState(state, live, win) : state;
+  };
   const notes: string[] = [];
 
-  if (q.weekday === 0) notes.push("It’s a Sunday, so no classes are scheduled — the building may be closed.");
-  if (q.isNow && now.minutes >= DAY_END) notes.push("Classes are over for today, so I checked the last hour of the teaching day.");
+  if (q.weekday === 0)
+    notes.push("It’s a Sunday, so no classes are scheduled — the building may be closed.");
+  if (q.isNow && now.minutes >= DAY_END)
+    notes.push("Classes are over for today, so I checked the last hour of the teaching day.");
 
   if (q.roomId) {
     const room = ROOMS.find((r) => r.id === q.roomId);
@@ -145,7 +179,7 @@ export function answerQuestion(input: string, now: Now, updates: FacultyUpdate[]
         rooms: [],
       };
     }
-    const s = roomState(room, win, SCHEDULE, updates);
+    const s = stateFor(room);
     let line = "";
     if (s.status === "offline") line = `${room.id} is not in service at the moment.`;
     else if (s.status === "busy")
@@ -161,12 +195,17 @@ export function answerQuestion(input: string, now: Now, updates: FacultyUpdate[]
   }
 
   if (q.unknownFloor !== undefined) {
-    notes.push(`The pilot covers floors 4–6 of the Digital Tower, so I searched those instead of floor ${q.unknownFloor}.`);
+    notes.push(
+      `The pilot covers floors 4–6 of the Digital Tower, so I searched those instead of floor ${q.unknownFloor}.`,
+    );
   }
 
-  const states = ROOMS.filter((r) => (q.floor === undefined || r.floor === q.floor) && (!q.type || r.type === q.type) && (!q.cap || r.capacity >= q.cap)).map((r) =>
-    roomState(r, win, SCHEDULE, updates),
-  );
+  const states = ROOMS.filter(
+    (r) =>
+      (q.floor === undefined || r.floor === q.floor) &&
+      (!q.type || r.type === q.type) &&
+      (!q.cap || r.capacity >= q.cap),
+  ).map((r) => stateFor(r));
   const free = sortStates(states.filter(isAvailable), q.from, favorites);
   const label = q.type ? TYPE_LABEL[q.type] : "rooms";
   const floorLabel = q.floor !== undefined ? ` on floor ${q.floor}` : "";
@@ -174,17 +213,24 @@ export function answerQuestion(input: string, now: Now, updates: FacultyUpdate[]
 
   if (!free.length) {
     return {
-      text: [...notes, `No ${label}${floorLabel}${capLabel} are free ${dayPhrase(q)}. Try a shorter slot or another floor.`].join(" "),
+      text: [
+        ...notes,
+        `No ${label}${floorLabel}${capLabel} are free ${dayPhrase(q)}. Try a shorter slot or another floor.`,
+      ].join(" "),
       rooms: [],
       query: q,
     };
   }
 
   const best = free[0]!;
-  const bestUntil = best.freeUntil === null ? "the rest of the day" : `until ${fmt(best.freeUntil)}`;
+  const bestUntil =
+    best.freeUntil === null ? "the rest of the day" : `until ${fmt(best.freeUntil)}`;
   const verified = free.filter((s) => s.status === "free").length;
   const main = `I found ${free.length} ${free.length === 1 ? label.replace(/s$/, "") : label}${floorLabel}${capLabel} free ${dayPhrase(q)}${q.isNow && q.dur !== 60 ? ` for the next ${fmtDuration(q.dur)}` : ""}. ${best.room.id} stays free the longest (${bestUntil}).`;
-  const caveat = verified < free.length ? ` ${free.length - verified} of them are “possibly free” because their timetable isn’t verified yet.` : "";
+  const caveat =
+    verified < free.length
+      ? ` ${free.length - verified} of them are “possibly free” because their timetable isn’t verified yet.`
+      : "";
 
   return { text: [...notes, main + caveat].join(" "), rooms: free.slice(0, 4), query: q };
 }

@@ -11,6 +11,18 @@ npm install      # or: bun install
 npm run dev      # opens on http://localhost:8080
 ```
 
+On Windows PowerShell, run:
+
+```powershell
+cd "D:\5th sem\unoocc-full-source\unoocc"
+npm install
+npm run dev
+```
+
+Then open http://localhost:8080. The live n8n webhook is configured through
+`LIVE_TIMETABLE_URL` and is available through the server-side `/api/timetable`
+proxy.
+
 Build for production: `npm run build`
 
 ## Tech
@@ -21,7 +33,7 @@ React 19 · TanStack Start · Vite · Tailwind CSS · Supabase (database for fac
 
 Database keys live in `.env` (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`). Database tables are defined in `supabase/` migrations.
 
-The live timetable integration has a server-side proxy at `/api/timetable`. Set `LIVE_TIMETABLE_URL` to the n8n JSON webhook URL; the timetable payload will be normalized into the app's `ScheduleEntry` format once the webhook response shape is provided.
+The live n8n `free-now` snapshot is proxied server-side at `/api/timetable`. The current-window room cards and assistant use the returned room list; other dates and times continue to use the local timetable data.
 
 ## Data
 

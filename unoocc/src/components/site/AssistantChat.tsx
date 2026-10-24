@@ -16,10 +16,21 @@ interface Msg {
   from?: number | undefined;
 }
 
-const CHIPS = ["Free labs right now", "Rooms free at 2 PM Monday", "Quiet room for 2 hours", "Is DT-604 free at 3 pm?"];
+const CHIPS = [
+  "Free labs right now",
+  "Rooms free at 2 PM Monday",
+  "Quiet room for 2 hours",
+  "Is DT-604 free at 3 pm?",
+];
 
-export function AssistantChat({ className, autoFocus }: { className?: string; autoFocus?: boolean }) {
-  const { now } = useNow();
+export function AssistantChat({
+  className,
+  autoFocus,
+}: {
+  className?: string;
+  autoFocus?: boolean;
+}) {
+  const { now, liveNow } = useNow();
   const updates = useStore((s) => s.updates);
   const favorites = useStore((s) => s.favorites);
   const [messages, setMessages] = useState<Msg[]>([
@@ -40,15 +51,32 @@ export function AssistantChat({ className, autoFocus }: { className?: string; au
     setMessages((m) => [...m, { id: idRef.current++, role: "user", text }]);
     setInput("");
     setTyping(true);
-    window.setTimeout(() => {
-      const res = answerQuestion(text, now, updates, favorites);
-      setMessages((m) => [...m, { id: idRef.current++, role: "bot", text: res.text, rooms: res.rooms, from: res.query?.from }]);
-      setTyping(false);
-    }, 650 + Math.random() * 450);
+    window.setTimeout(
+      () => {
+        const res = answerQuestion(text, now, updates, favorites, liveNow);
+        setMessages((m) => [
+          ...m,
+          {
+            id: idRef.current++,
+            role: "bot",
+            text: res.text,
+            rooms: res.rooms,
+            from: res.query?.from,
+          },
+        ]);
+        setTyping(false);
+      },
+      650 + Math.random() * 450,
+    );
   };
 
   return (
-    <div className={cn("flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border bg-card shadow-card", className)}>
+    <div
+      className={cn(
+        "flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border bg-card shadow-card",
+        className,
+      )}
+    >
       <div className="flex items-center gap-3 border-b bg-primary px-4 py-3 text-primary-foreground">
         <span className="grid size-9 place-items-center rounded-xl bg-gradient-brand text-brand-foreground">
           <Bot className="size-5" />
@@ -60,7 +88,11 @@ export function AssistantChat({ className, autoFocus }: { className?: string; au
         <Sparkles className="ml-auto size-4 text-brand" />
       </div>
 
-      <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4" aria-live="polite">
+      <div
+        ref={scrollRef}
+        className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4"
+        aria-live="polite"
+      >
         <AnimatePresence initial={false}>
           {messages.map((m) => (
             <motion.div
@@ -73,7 +105,9 @@ export function AssistantChat({ className, autoFocus }: { className?: string; au
               <p
                 className={cn(
                   "max-w-[88%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed",
-                  m.role === "user" ? "rounded-br-md bg-brand text-brand-foreground" : "rounded-bl-md bg-secondary text-secondary-foreground",
+                  m.role === "user"
+                    ? "rounded-br-md bg-brand text-brand-foreground"
+                    : "rounded-bl-md bg-secondary text-secondary-foreground",
                 )}
               >
                 {m.text}
@@ -89,9 +123,16 @@ export function AssistantChat({ className, autoFocus }: { className?: string; au
           ))}
         </AnimatePresence>
         {typing && (
-          <div className="flex w-fit items-center gap-1 rounded-2xl rounded-bl-md bg-secondary px-4 py-3" aria-label="Assistant is typing">
+          <div
+            className="flex w-fit items-center gap-1 rounded-2xl rounded-bl-md bg-secondary px-4 py-3"
+            aria-label="Assistant is typing"
+          >
             {[0, 1, 2].map((i) => (
-              <span key={i} className="size-1.5 rounded-full bg-secondary-foreground animate-typing" style={{ animationDelay: `${i * 0.15}s` }} />
+              <span
+                key={i}
+                className="size-1.5 rounded-full bg-secondary-foreground animate-typing"
+                style={{ animationDelay: `${i * 0.15}s` }}
+              />
             ))}
           </div>
         )}
